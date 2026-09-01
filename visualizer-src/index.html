@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      Postman's real CSP on the visualizer iframe. Since Vite's dev server
+      transforms .vue files into plain JS on the server side (no in-browser
+      compilation, in dev OR prod), this project never needs unsafe-eval —
+      this meta tag just proves that, the same way it does for the Alpine
+      project's Visualizer panel.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="script-src http: https: 'unsafe-inline'" />
+    <title>Postman Visualizer (Vue)</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
