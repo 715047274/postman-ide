@@ -1,5 +1,8 @@
 <template>
   <Card class="page" title="Page 1 — Detail">
+    <p>
+      Navigated here with route param <Tag color="purple">id = {{ currentParams.id }}</Tag>
+    </p>
     <p>Raw value currently in <code>localStorage.counter</code>:</p>
     <Tag color="blue">{{ rawValue }}</Tag>
     <div class="back-link">
@@ -11,7 +14,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Card, Tag, Button } from 'ant-design-vue'
-import { navigate } from '../router.js'
+import { navigate, currentParams } from '../../router'
 
 // Deliberately re-reads from localStorage directly rather than sharing
 // Page1's `count` ref — these are two separate components, mounted one

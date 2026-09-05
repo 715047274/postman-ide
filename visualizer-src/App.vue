@@ -2,12 +2,9 @@
   <div class="app-shell">
     <h1>Postman Visualizer Demo (Vue, custom router + antd-vue)</h1>
     <Tabs :activeKey="currentRoute" @change="navigate">
-      <TabPane key="page1" tab="Page 1" />
-      <TabPane key="page1.detail" tab="Page 1 · Detail" />
-      <TabPane key="page2" tab="Page 2" />
-      <TabPane key="config" tab="Config" />
+      <TabPane v-for="item in navItems" :key="item.name" :tab="item.label" />
     </Tabs>
-    <component :is="routes[currentRoute] || NotFound" />
+    <component :is="resolveComponent(currentRoute)" />
   </div>
 </template>
 
@@ -21,25 +18,17 @@ import { Tabs } from 'ant-design-vue'
 // reasoning).
 import 'ant-design-vue/dist/reset.css'
 import './pmMock.js'
-import { currentRoute, navigate } from './router.js'
-import Page1 from './pages/Page1.vue'
-import Page1Detail from './pages/Page1Detail.vue'
-import Page2 from './pages/Page2.vue'
-import Config from './pages/Config.vue'
-import NotFound from './pages/NotFound.vue'
+import { currentRoute, navigate, navItems, resolveComponent, beforeEach } from './router/index.js'
 
 const TabPane = Tabs.TabPane
 
-// A plain object, not reactive — the set of available pages never
-// changes at runtime, only which one is currently selected does (that's
-// `currentRoute`, imported above). Dynamic dispatch happens entirely via
-// Vue's built-in <component :is="...">, no router library involved.
-const routes = {
-  page1: Page1,
-  'page1.detail': Page1Detail,
-  page2: Page2,
-  config: Config
-}
+// A global guard — runs before every navigation, regardless of route.
+// Logging here; return `false` from a guard to cancel navigation, or a
+// route name (string) to redirect, same as router/routes.js's
+// page1.detail example does per-route.
+beforeEach((to, from) => {
+  console.log(`[guard] navigating: "${from.name}" → "${to.name}"`, to.params)
+})
 
 onMounted(() => {
   console.log('[visualizer] App mounted, current route:', currentRoute.value)

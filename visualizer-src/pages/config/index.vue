@@ -1,11 +1,11 @@
 <template>
   <Card class="page config-page" title="Environment Configs">
     <Alert
-      type="warning"
-      show-icon
-      message="This page cannot set Postman environment variables directly"
-      description="Postman's visualizer only exposes pm.getData() — pm.environment.set() silently does nothing here, a long-standing platform limitation (see postmanlabs/postman-app-support#8341). Instead, this generates a script for the Pre-request Script tab, which has full pm.environment access."
-      style="margin-bottom: 16px"
+        type="warning"
+        show-icon
+        message="This page cannot set Postman environment variables directly"
+        description="Postman's visualizer only exposes pm.getData() — pm.environment.set() silently does nothing here, a long-standing platform limitation (see postmanlabs/postman-app-support#8341). Instead, this generates a script for the Pre-request Script tab, which has full pm.environment access."
+        style="margin-bottom: 16px"
     />
 
     <Space direction="vertical" style="width: 100%" size="middle">
@@ -37,10 +37,10 @@
     </Space>
 
     <Modal
-      v-model:open="formVisible"
-      :title="editingName ? `Edit ${editingName}` : 'New config'"
-      width="640px"
-      @ok="save"
+        v-model:open="formVisible"
+        :title="editingName ? `Edit ${editingName}` : 'New config'"
+        width="640px"
+        @ok="save"
     >
       <Form layout="vertical">
         <FormItem label="Instance name (object key)">

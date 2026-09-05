@@ -8,5 +8,5 @@
 
 <script setup>
 import { Result, Button } from 'ant-design-vue'
-import { currentRoute, navigate } from '../router.js'
+import { currentRoute, navigate } from '../router'
 </script>

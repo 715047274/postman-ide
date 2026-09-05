@@ -16,10 +16,10 @@ const loading = ref(true)
 onMounted(() => {
   pm.getData((error, data) => {
     summary.value = error
-      ? 'Error loading response data'
-      : data && data.name
-        ? `Name: ${data.name}`
-        : 'No "name" field in the response'
+        ? 'Error loading response data'
+        : data && data.name
+            ? `Name: ${data.name}`
+            : 'No "name" field in the response'
     loading.value = false
   })
 })
