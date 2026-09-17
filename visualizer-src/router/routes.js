@@ -1,5 +1,5 @@
-import Page1 from '../pages/page1/index.vue'
-import Page1Detail from '../pages/page1/detail.vue'
+import Login from '../pages/login/index.vue'
+import Page1Detail from '../pages/login/detail.vue'
 import Page2 from '../pages/page2/index.vue'
 import Config from '../pages/config/index.vue'
 import NotFound from '../pages/NotFound.vue'
@@ -15,15 +15,15 @@ import NotFound from '../pages/NotFound.vue'
 // top-level one; there's no special nested-rendering behavior here.
 export const routes = [
     {
-        name: 'page1',
-        path: 'page1',
-        label: 'Page 1',
-        component: Page1,
+        name: 'login',
+        path: 'login',
+        label: 'login',
+        component: Login,
         children: [
             {
-                name: 'page1.detail',
-                path: 'page1.detail',
-                label: 'Page 1 · Detail',
+                name: 'login.detail',
+                path: 'login.detail',
+                label: 'login· Detail',
                 component: Page1Detail,
                 // Example per-route guard: only reachable when navigated to with
                 // an `id` param (e.g. via navigate('page1.detail', { id: 5 })) —
