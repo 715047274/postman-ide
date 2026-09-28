@@ -22,8 +22,9 @@
 
 <script setup>
 import { reactive, ref } from 'vue'
-import { Card, Divider } from 'ant-design-vue'
+import { Card, Divider, Button } from 'ant-design-vue'
 import CardContainer from './component/cardContainer.vue'
+import { login } from '../../api/LoginApi.js'
 // A plain .js module (not .json) so template literals work — see
 // config/environments.js's `version` variable.
 import { environments as seedEnvironments } from './env.js'
@@ -96,22 +97,30 @@ function handleSelect({ name, envData }) {
 const loggingIn = ref(false)
 const loginResult = ref('')
 
-// Stand-in for whatever the real login flow needs — your original
-// script's actual login used a preload request (cheerio, __VIEWSTATE)
-// via pm.sendRequest, which only works in a Pre-request/Test script, not
-// here in the visualizer (same pm.environment constraint covered
-// earlier). This proves out the loading-state UX with a real outbound
-// call instead, same axios pattern as Page 1 Detail's POC. Swap the body
-// of this function for whatever "login" should actually mean once
-// that's pinned down — the loading/error wiring around it stays the same.
+// Real two-part login (see api/loginApi.js): fetch the ASP.NET
+// __VIEWSTATE off the login page, then POST the login form with it.
+// Note the CORS caveat documented at the top of loginApi.js — this is a
+// faithful rewrite of a flow that worked via pm.sendRequest (no CORS,
+// since that's Postman's own HTTP layer, not a browser), but running
+// the same requests via axios here, in the visualizer's real browser
+// context, may well be blocked by CORS on Dayforce's side. A CORS error
+// here doesn't mean this code is wrong — see loginApi.js for the two
+// real ways around it (a local proxy, or running this as a Pre-request/
+// Test script in actual Postman instead).
 async function handleLogin() {
   loggingIn.value = true
   loginResult.value = ''
   try {
-    const res = await axios.get(selectedEnvData.value.baseUrl, { timeout: 8000 })
-    loginResult.value = `Reached ${selectedEnvData.value.baseUrl} — status ${res.status}`
+    const { baseUrl, clientName, adminName, password } = selectedEnvData.value
+    const { response } = await login({ baseUrl, clientName, adminName, password })
+    // `response` is now the pm.sendRequest-shaped object sendRequest()
+    // hands back (see api/client.js) — .code instead of axios's .status.
+    loginResult.value = `Login POST completed — status ${response.code}`
   } catch (err) {
-    loginResult.value = `Login check failed: ${err.message}`
+    // Only a genuine network failure lands here now (matching real
+    // pm.sendRequest semantics) — a 4xx/5xx from the server comes back
+    // as a normal response with response.code set, not a thrown error.
+    loginResult.value = `Login failed: ${err.message}`
   } finally {
     loggingIn.value = false
   }
@@ -122,5 +131,11 @@ async function handleLogin() {
 .selected-summary {
   font-size: 13px;
   color: #444;
+  margin-bottom: 8px;
+}
+.login-result {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #666;
 }
 </style>
