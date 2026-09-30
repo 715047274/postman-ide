@@ -11,21 +11,41 @@
     <Space direction="vertical" style="width: 100%" size="middle">
       <Button type="primary" @click="openCreate">+ New config</Button>
 
-      <List bordered :dataSource="configEntries" :locale="{ emptyText: 'No configs yet — add one above' }">
-        <template #renderItem="{ item }">
-          <ListItem>
-            <template #actions>
-              <a @click="select(item.name)">{{ item.name === activeName ? 'Selected' : 'Select' }}</a>
-              <a @click="openEdit(item.name)">Edit</a>
-              <a @click="remove(item.name)">Delete</a>
+      <Empty v-if="!configEntries.length" description="No configs yet — add one above" />
+
+      <Row v-else :gutter="[12, 12]">
+        <Col v-for="entry in configEntries" :key="entry.name" :span="8">
+          <Card
+              hoverable
+              size="small"
+              :class="['env-card', { 'env-card--active': entry.name === activeName }]"
+              @click="select(entry.name)"
+          >
+            <template #title>{{ entry.name }}</template>
+            <template #extra>
+              <Tag v-if="entry.name === activeName" color="green">Active</Tag>
             </template>
-            <ListItemMeta :title="item.name" :description="item.config.baseUrl" />
-          </ListItem>
-        </template>
-      </List>
+            <p class="env-card__url">{{ entry.config.baseUrl }}</p>
+            <Space size="small">
+              <Button size="small" @click.stop="openEdit(entry.name)">Edit</Button>
+              <Button size="small" danger @click.stop="remove(entry.name)">Delete</Button>
+            </Space>
+          </Card>
+        </Col>
+      </Row>
 
       <div v-if="configEntries.length">
         <Divider>Generated Pre-request Script</Divider>
+        <Space direction="vertical" size="small" style="width: 100%; margin-bottom: 10px">
+          <Space>
+            <Switch v-model:checked="includeCssInjection" size="small" />
+            <span>Inject Bulma CSS variable (matches your existing script)</span>
+          </Space>
+          <Space>
+            <Switch v-model:checked="includeViewStatePreload" size="small" />
+            <span>Also fetch ASP.NET __VIEWSTATE via a preload request (cheerio)</span>
+          </Space>
+        </Space>
         <p class="hint">
           Paste this once into the request's (or Collection's) <strong>Pre-request Script</strong> tab. To switch
           which config is active afterward, edit the <code>activeInstanceName</code> variable in Postman's
@@ -78,10 +98,28 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
-import { Card, Space, Button, List, Divider, Modal, Form, Input, InputNumber, Alert, message } from 'ant-design-vue'
+// Wraps localStorage so a throw inside Postman's visualizer sandbox
+// (a `data:` URL iframe disables storage entirely) doesn't crash this
+// page — see safeStorage.js.
+import { safeStorage } from '../../safeStorage.js'
+import {
+  Card,
+  Space,
+  Button,
+  Row,
+  Col,
+  Tag,
+  Empty,
+  Switch,
+  Divider,
+  Modal,
+  Form,
+  Input,
+  InputNumber,
+  Alert,
+  message
+} from 'ant-design-vue'
 
-const ListItem = List.Item
-const ListItemMeta = List.Item.Meta
 const FormItem = Form.Item
 
 const STORAGE_KEY = 'envConfigs'
@@ -89,7 +127,7 @@ const ACTIVE_KEY = 'envConfigsActiveName'
 
 function loadConfigs() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}
+    return JSON.parse(safeStorage.getItem(STORAGE_KEY)) || {}
   } catch {
     return {}
   }
@@ -98,17 +136,17 @@ function loadConfigs() {
 // `reactive`, not `ref` — configs is a dictionary we mutate in place
 // (add/edit/delete keys) rather than replace wholesale.
 const configs = reactive(loadConfigs())
-const activeName = ref(localStorage.getItem(ACTIVE_KEY) || '')
+const activeName = ref(safeStorage.getItem(ACTIVE_KEY) || '')
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(configs))
+  safeStorage.setItem(STORAGE_KEY, JSON.stringify(configs))
 }
 
 const configEntries = computed(() => Object.entries(configs).map(([name, config]) => ({ name, config })))
 
 function select(name) {
   activeName.value = name
-  localStorage.setItem(ACTIVE_KEY, name)
+  safeStorage.setItem(ACTIVE_KEY, name)
 }
 
 function remove(name) {
@@ -116,7 +154,7 @@ function remove(name) {
   persist()
   if (activeName.value === name) {
     activeName.value = ''
-    localStorage.removeItem(ACTIVE_KEY)
+    safeStorage.removeItem(ACTIVE_KEY)
   }
 }
 
@@ -173,43 +211,84 @@ function save() {
   formVisible.value = false
 }
 
-// The whole configs object is embedded in the generated script (not just
-// the currently-selected one), keyed by `activeInstanceName` — a real
-// Postman environment variable you edit directly in Postman's own
-// Environment editor to switch instances, without ever re-pasting this
-// script. That variable lives in pm.environment, which this script CAN
-// read/write, because it's designed to run in the Pre-request Script tab
-// — a completely different execution context from the visualizer iframe
-// this page is rendered inside.
+const includeCssInjection = ref(true)
+const includeViewStatePreload = ref(true)
+
+// Built as an array of plain lines, not one big template literal — the
+// generated code itself uses backticks (the css injection line, the
+// preloadUrl line), and writing those directly inside an outer template
+// literal here would need the same nested-backtick escaping we handled
+// by hand in the standalone Vue h()-based script earlier. Plain
+// single-quoted strings joined with '\n' sidestep that entirely.
 const generatedScript = computed(() => {
   if (configEntries.value.length === 0) return ''
   const fallback = activeName.value || configEntries.value[0].name
 
-  return `// Auto-generated by the Config page — paste into the request's or
-// Collection's Pre-request Script tab (NOT the visualizer/Tests tab —
-// pm.environment isn't reachable from inside the visualizer).
-// To switch environments afterward, edit "activeInstanceName" in
-// Postman's Environment editor; no need to re-paste this script.
-const environments = ${JSON.stringify(configs, null, 2)};
+  const lines = []
+  lines.push("// Auto-generated by the Config page — paste into the request's or")
+  lines.push("// Collection's Pre-request Script tab (NOT the visualizer/Tests tab —")
+  lines.push("// pm.environment isn't reachable from inside the visualizer).")
+  lines.push('// To switch environments afterward, edit "activeInstanceName" in')
+  lines.push("// Postman's Environment editor; no need to re-paste this script.")
+  lines.push(`const environments = ${JSON.stringify(configs, null, 2)};`)
+  lines.push('')
+  lines.push(`const activeInstanceName = pm.environment.get("activeInstanceName") || ${JSON.stringify(fallback)};`)
+  lines.push('const instance = environments[activeInstanceName];')
+  lines.push('')
+  lines.push('if (!instance) {')
+  lines.push('  console.warn(\'No config named "\' + activeInstanceName + \'" in the environments object above.\');')
+  lines.push('} else {')
 
-const activeInstanceName = pm.environment.get("activeInstanceName") || ${JSON.stringify(fallback)};
-const instance = environments[activeInstanceName];
+  if (includeCssInjection.value) {
+    lines.push('  // css for the bulma')
+    lines.push('  let css = `<link href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css" rel="stylesheet"/>`;')
+    lines.push('  pm.environment.set("css", css);')
+    lines.push('')
+  }
 
-if (!instance) {
-  console.warn('No config named "' + activeInstanceName + '" in the environments object above.');
-} else {
-  // setup environment variables
-  pm.environment.set("baseUrl", instance.baseUrl)
-  pm.environment.set("uiUrl", instance.uiUrl)
-  pm.environment.set("clientInstance", instance.clientName)
-  pm.environment.set("adminName", instance.adminName)
-  pm.environment.set("adminPass", instance.password)
-  pm.environment.set("testSvcUrl", instance.testSvcUrl)
-  // frontend gateway
-  pm.environment.set("remoteFrontendUrl", instance.remoteFrontendUrl)
-  pm.environment.set("gatewayContext", JSON.stringify(instance.gatewayContext))
-}
-`
+  lines.push('  // setup environment variables')
+  lines.push('  pm.environment.set("baseUrl", instance.baseUrl)')
+  lines.push('  pm.environment.set("uiUrl", instance.uiUrl)')
+  lines.push('  pm.environment.set("clientInstance", instance.clientName)')
+  lines.push('  pm.environment.set("adminName", instance.adminName)')
+  lines.push('  pm.environment.set("adminPass", instance.password)')
+  lines.push('  pm.environment.set("testSvcUrl", instance.testSvcUrl)')
+  lines.push('  // frontend gateway')
+  lines.push('  pm.environment.set("remoteFrontendUrl", instance.remoteFrontendUrl)')
+  lines.push('  pm.environment.set("gatewayContext", JSON.stringify(instance.gatewayContext))')
+
+  if (includeViewStatePreload.value) {
+    lines.push('')
+    lines.push('  // Requires "cheerio" to be enabled among this request\'s allowed')
+    lines.push("  // external libraries — Postman's sandbox exposes a curated set of npm")
+    lines.push('  // packages this way (cheerio included), which is separate from — and')
+    lines.push("  // much narrower than — Node's general require(), which is blocked")
+    lines.push('  // entirely in Postman scripts (no fs, no arbitrary npm install).')
+    lines.push('  const cheerio = require("cheerio");')
+    lines.push('')
+    lines.push('  let preloadUrl = `${pm.environment.get("baseUrl")}/MyDayforce.aspx`;')
+    lines.push('  let preloadOptions = {')
+    lines.push('    url: preloadUrl,')
+    lines.push("    method: 'GET',")
+    lines.push('    header: {')
+    lines.push("      'Content-Type': 'text/html; charset=utf-8',")
+    lines.push("      'Accept-Language': 'en-US,en;q=0.9'")
+    lines.push('    }')
+    lines.push('  };')
+    lines.push('')
+    lines.push('  pm.sendRequest(preloadOptions, (err, resp) => {')
+    lines.push('    if (resp && resp.code == 200) {')
+    lines.push('      const $ = cheerio.load(resp.text());')
+    lines.push('      pm.environment.set("VIEWSTATE", $(\'#__VIEWSTATE\').attr(\'value\'));')
+    lines.push('      pm.environment.set("VIEWSTATEGENERATOR", $(\'#__VIEWSTATEGENERATOR\').attr(\'value\'));')
+    lines.push('    }')
+    lines.push('  });')
+  }
+
+  lines.push('}')
+  lines.push('')
+
+  return lines.join('\n')
 })
 
 const copied = ref(false)
@@ -235,5 +314,20 @@ async function copyScript() {
   overflow: auto;
   text-align: left;
   white-space: pre;
+}
+.env-card {
+  cursor: pointer;
+}
+.env-card--active {
+  border-color: #52c41a;
+  box-shadow: 0 0 0 1px #52c41a;
+}
+.env-card__url {
+  font-size: 11px;
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 8px;
 }
 </style>

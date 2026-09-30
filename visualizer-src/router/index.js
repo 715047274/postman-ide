@@ -1,5 +1,9 @@
 import { ref, reactive } from 'vue'
 import { routes, notFoundRoute } from './routes.js'
+// Wraps localStorage so a throw inside Postman's visualizer sandbox (a
+// `data:` URL iframe disables storage entirely — see safeStorage.js)
+// doesn't crash the router at module load, before anything can render.
+import { safeStorage } from '../safeStorage.js'
 
 const STORAGE_KEY = 'visualizerRoute'
 const PARAMS_STORAGE_KEY = 'visualizerRouteParams'
@@ -38,11 +42,11 @@ export const navItems = flatRoutes.map((r) => ({ name: r.name, label: r.label })
 // inside it once you are.
 export const topLevelNavItems = flatRoutes.filter((r) => r.chain.length === 1).map((r) => ({ name: r.name, label: r.label }))
 
-export const currentRoute = ref(localStorage.getItem(STORAGE_KEY) || flatRoutes[0]?.name || '')
+export const currentRoute = ref(safeStorage.getItem(STORAGE_KEY) || flatRoutes[0]?.name || '')
 
 function loadParams() {
     try {
-        return JSON.parse(localStorage.getItem(PARAMS_STORAGE_KEY)) || {}
+        return JSON.parse(safeStorage.getItem(PARAMS_STORAGE_KEY)) || {}
     } catch {
         return {}
     }
@@ -51,7 +55,7 @@ function loadParams() {
 export const currentParams = reactive(loadParams())
 
 function persistParams() {
-    localStorage.setItem(PARAMS_STORAGE_KEY, JSON.stringify(currentParams))
+    safeStorage.setItem(PARAMS_STORAGE_KEY, JSON.stringify(currentParams))
 }
 
 // ---------------------------------------------------------------------
@@ -101,7 +105,7 @@ export function navigate(routeName, params = {}) {
     }
 
     currentRoute.value = routeName
-    localStorage.setItem(STORAGE_KEY, routeName)
+    safeStorage.setItem(STORAGE_KEY, routeName)
 
     for (const key of Object.keys(currentParams)) delete currentParams[key]
     Object.assign(currentParams, params)

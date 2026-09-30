@@ -33,18 +33,23 @@
 // None of this is Postman's real implementation — it's a best-effort
 // approximation for local development, not a spec-compliant reproduction.
 
+// Wraps localStorage so it can't throw and take this whole file down —
+// see safeStorage.js for why that throw happens inside Postman's
+// visualizer sandbox specifically.
+import { safeStorage } from './safeStorage.js'
+
 const STORAGE_PREFIX = 'pmMock:'
 
 function loadStore(name) {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_PREFIX + name)) || {}
+    return JSON.parse(safeStorage.getItem(STORAGE_PREFIX + name)) || {}
   } catch {
     return {}
   }
 }
 
 function saveStore(name, store) {
-  localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify(store))
+  safeStorage.setItem(STORAGE_PREFIX + name, JSON.stringify(store))
 }
 
 // ---------------------------------------------------------------------

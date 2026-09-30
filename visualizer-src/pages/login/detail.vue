@@ -25,6 +25,10 @@ import { ref } from 'vue'
 import axios from 'axios'
 import { Card, Tag, Button, Divider } from 'ant-design-vue'
 import { navigate, currentParams } from '../../router/index.js'
+// Wraps localStorage so a throw inside Postman's visualizer sandbox (a
+// `data:` URL iframe disables storage entirely) doesn't crash this page
+// — see safeStorage.js.
+import { safeStorage } from '../../safeStorage.js'
 
 // Deliberately re-reads from localStorage directly rather than sharing
 // Page1's `count` ref — these are two separate components, mounted one
@@ -33,7 +37,7 @@ import { navigate, currentParams } from '../../router/index.js'
 // re-render this visualizer fresh on every Send. `currentParams.id`
 // above is different — that's the route param passed via
 // navigate('page1.detail', { id }), not derived from localStorage at all.
-const rawValue = ref(localStorage.getItem('counter'))
+const rawValue = ref(safeStorage.getItem('counter'))
 
 const posting = ref(false)
 const postResult = ref('')
